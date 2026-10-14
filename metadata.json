@@ -1,0 +1,6 @@
+{
+  "name": "ProjectPilot AI",
+  "description": "AI-powered meeting notes extractor, staging gate, action tracker, and ISO 31000 risk register for industrial engineering projects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
