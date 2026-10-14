@@ -5,8 +5,25 @@
 import { GoogleGenAI } from "@google/genai";
 import { ActionItem, RiskItem, StagingExtractionResult } from "../types";
 
-// Strict API Key Initialization as specified
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+/**
+ * Lazy initialization of GoogleGenAI client.
+ * Retrieves key from process.env.GEMINI_API_KEY or import.meta.env.VITE_GEMINI_API_KEY.
+ * Avoids crashing the app on startup if no key is present in the browser environment.
+ */
+function getGeminiClient(): GoogleGenAI {
+  const apiKey =
+    (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
+    '';
+
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'MY_GEMINI_API_KEY') {
+    throw new Error(
+      "Gemini API key is not configured. Please set GEMINI_API_KEY in your environment or Secrets panel to enable AI extraction."
+    );
+  }
+
+  return new GoogleGenAI({ apiKey: apiKey.trim() });
+}
 
 const EXTRACTION_SYSTEM_INSTRUCTION = `You are ProjectPilot AI, an elite industrial engineering & project governance intelligence system.
 Your mission is to parse raw, messy meeting notes and site logs into high-integrity project registers aligned with ISO 31000 risk standards.
@@ -134,6 +151,7 @@ ${notes}
 
 Extract all updates, new actions, risks/issues, and decisions. Return ONLY a valid JSON object matching the requested schema.`;
 
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: "gemini-flash-latest",
       contents: prompt,
@@ -181,6 +199,7 @@ REQUIREMENTS:
 PROJECT JSON STATE:
 ${JSON.stringify(projectData, null, 2)}`;
 
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: "gemini-flash-latest",
       contents: prompt,

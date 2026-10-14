@@ -1829,21 +1829,16 @@ export default function App() {
       )}
 
       {/* Global Professional Sticky Footer */}
-      {appScreen === 'workspace' && (
-        <footer className="border-t border-slate-200 bg-white py-3.5 text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-slate-700">
-              {uiDict[language].footer.brand}
-            </span>
-            <span className="font-mono text-[11px] text-slate-400">
-              {uiDict[language].footer.meta(currentVersion, state.riskFramework === 'PMI' ? 'PMI PMBOK®' : 'ISO 31000')}
-            </span>
-          </div>
-          <div className="max-w-7xl mx-auto px-4 pt-1.5 text-center text-[11px] text-slate-400">
-            © 2026 Cesar Herrera. {uiDict[language].footer.copyright}
-          </div>
-        </footer>
-      )}
+      <footer className="mt-auto border-t border-slate-200 bg-white/95 backdrop-blur-xs py-3 text-xs text-gray-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1.5">
+          <span className="font-medium text-slate-600 text-center sm:text-left text-xs">
+            {uiDict[language].footer.brand} · {uiDict[language].footer.meta(currentVersion, state.riskFramework === 'PMI' ? 'PMI PMBOK®' : 'ISO 31000')}
+          </span>
+          <span className="text-gray-500 text-xs text-center font-normal">
+            © 2026 Cesar Herrera. All rights reserved. For demonstration and portfolio purposes only.
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
