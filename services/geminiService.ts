@@ -1,8 +1,29 @@
+// Copyright (c) 2026 Cesar Herrera.
+// All rights reserved.
+// This code is provided for portfolio demonstration purposes.
+
 import { GoogleGenAI } from "@google/genai";
 import { ActionItem, RiskItem, StagingExtractionResult } from "../src/types";
 
-// Strict API Key Initialization as specified
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+/**
+ * Lazy initialization of GoogleGenAI client.
+ * Retrieves key from process.env.GEMINI_API_KEY or import.meta.env.VITE_GEMINI_API_KEY.
+ * Avoids crashing the app on startup if no key is present in the browser environment.
+ */
+function getGeminiClient(): GoogleGenAI {
+  const apiKey =
+    (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
+    '';
+
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'MY_GEMINI_API_KEY') {
+    throw new Error(
+      "Gemini API key is not configured. Please set GEMINI_API_KEY in your environment or Secrets panel to enable AI extraction."
+    );
+  }
+
+  return new GoogleGenAI({ apiKey: apiKey.trim() });
+}
 
 const EXTRACTION_SYSTEM_INSTRUCTION = `You are ProjectPilot AI, an elite industrial engineering & project governance intelligence system.
 Your mission is to parse raw, messy meeting notes and site logs into high-integrity project registers aligned with ISO 31000 risk standards.
@@ -85,11 +106,16 @@ Respond ONLY with a valid JSON object matching this exact structure:
   ]
 }`;
 
+/**
+ * Extracts validated actions, risks, updates, and decisions from meeting notes.
+ * Uses gemini-flash-latest with JSON mode.
+ */
 export async function extractProjectUpdates(
   notes: string,
   referenceDate: string,
   currentActions: ActionItem[],
-  currentRisks: RiskItem[]
+  currentRisks: RiskItem[],
+  language: 'en' | 'es' | 'fr' = 'en'
 ): Promise<StagingExtractionResult> {
   const trimmed = notes.trim();
   if (!trimmed || trimmed.length < 15) {
@@ -106,6 +132,10 @@ export async function extractProjectUpdates(
   }
 
   try {
+    const langDirective = `\n\nCRITICAL LANGUAGE INSTRUCTION: The user interface is currently set to ${
+      language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : 'English'
+    }. You MUST write all generated text, summaries, extracted titles, descriptions, mitigation plans, validation notes, and decisions in this exact language, regardless of the language of the original meeting notes. Leave the 'sourceQuote' in its original language.`;
+
     const prompt = `REFERENCE DATE: ${referenceDate}
 
 CURRENT EXISTING ACTION ITEMS:
@@ -121,11 +151,12 @@ ${notes}
 
 Extract all updates, new actions, risks/issues, and decisions. Return ONLY a valid JSON object matching the requested schema.`;
 
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: "gemini-flash-latest",
       contents: prompt,
       config: {
-        systemInstruction: EXTRACTION_SYSTEM_INSTRUCTION,
+        systemInstruction: EXTRACTION_SYSTEM_INSTRUCTION + langDirective,
         responseMimeType: "application/json",
         temperature: 0.1,
       },
@@ -145,8 +176,16 @@ Extract all updates, new actions, risks/issues, and decisions. Return ONLY a val
   }
 }
 
-export async function generateExecutiveSummary(projectData: any): Promise<string> {
+/**
+ * Generates a grounded 2-paragraph executive summary citing exact IDs.
+ * Uses gemini-flash-latest.
+ */
+export async function generateExecutiveSummary(
+  projectData: any,
+  language: 'en' | 'es' | 'fr' = 'en'
+): Promise<string> {
   try {
+    const langTarget = language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : 'English';
     const prompt = `You are a Lead Project Governance Officer.
 Write a concise, professional 2-paragraph executive summary of the current project status based strictly on the JSON data below.
 
@@ -154,15 +193,17 @@ REQUIREMENTS:
 - First paragraph: Summarize overall progress, total open actions, completion rate, and active schedule status.
 - Second paragraph: Detail critical risks, blockers, and items requiring clarification. Cite exact item IDs (such as ACT-001, RSK-001) in parentheses.
 - Strictly Grounded: NEVER invent milestones, budgets, or team members outside of the provided JSON data.
+- CRITICAL LANGUAGE INSTRUCTION: You MUST write the entire executive summary in ${langTarget}.
 
 PROJECT JSON STATE:
 ${JSON.stringify(projectData, null, 2)}`;
 
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: "gemini-flash-latest",
       contents: prompt,
       config: {
-        systemInstruction: "You are an executive project controls analyst. Be strictly grounded, concise, and cite IDs directly.",
+        systemInstruction: `You are an executive project controls analyst. Be strictly grounded, concise, and cite IDs directly. CRITICAL LANGUAGE INSTRUCTION: You MUST write the entire executive summary in ${langTarget}.`,
         temperature: 0.2,
       },
     });
@@ -179,6 +220,10 @@ ${JSON.stringify(projectData, null, 2)}`;
   }
 }
 
+/**
+ * Sanitizes and validates the extracted result to guarantee strict typing
+ * and treats empty string / null owners or dates as missing (Needs Clarification).
+ */
 function sanitizeExtractionResult(res: Partial<StagingExtractionResult>): StagingExtractionResult {
   return {
     isSufficientInput: res.isSufficientInput ?? true,
